@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS := -Wall -g -O2 -flto -fwhole-program -fno-use-linker-plugin
+CFLAGS := -Wall -g -O2 -fPIC -flto -fwhole-program -fno-use-linker-plugin
 
 OBJECTS = pyhelper.o serialqueue.o stepcompress.o itersolve.o trapq.o \
 		  pollreactor.o msgblock.o trdispatch.o \
