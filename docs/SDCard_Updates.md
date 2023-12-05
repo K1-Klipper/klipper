@@ -127,13 +127,13 @@ BOARD_DEFS = {
 ```
 
 The following fields may be specified:
-- `mcu`: The mcu type.  This can be retrieved after configuring the build
+- `mcu`: The mcu type.  This can be retrevied after configuring the build
   via `make menuconfig` by running `cat .config | grep CONFIG_MCU`.  This
   field is required.
-- `spi_bus`:  The SPI bus connected to the SD Card.  This should be retrieved
+- `spi_bus`:  The SPI bus connected to the SD Card.  This should be retreived
   from the board's schematic.  This field is required.
 - `cs_pin`: The Chip Select Pin connected to the SD Card.  This should be
-  retrieved from the board schematic.  This field is required.
+  retreived from the board schematic.  This field is required.
 - `firmware_path`: The path on the SD Card where firmware should be
   transferred.  The default is `firmware.bin`.
 - `current_firmware_path`: The path on the SD Card where the renamed firmware
@@ -170,7 +170,7 @@ BOARD_ALIASES = {
 
 If you need a new board definition and you are uncomfortable with the
 procedure outlined above it is recommended that you request one in
-the [Klipper Discord](Contact.md).
+the [Klipper Community Discord](Contact.md#discord).
 
 ## Flashing Boards that use SDIO
 

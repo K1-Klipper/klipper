@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 # Script to extract config and shutdown information file a klippy.log file
 #
 # Copyright (C) 2017  Kevin O'Connor <kevin@koconnor.net>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import sys, re, collections, ast, itertools
+import sys, re, collections, ast
 
 def format_comment(line_num, line):
     return "# %6d: %s" % (line_num, line)
@@ -40,10 +40,9 @@ class GatherConfig:
         if comment is not None:
             self.comments.append(comment)
     def write_file(self):
-        lines = itertools.chain(self.comments, self.config_lines)
-        lines = ('%s\n' % l for l in lines)
-        with open(self.filename, 'wt') as f:
-            f.writelines(lines)
+        f = open(self.filename, 'wb')
+        f.write('\n'.join(self.comments + self.config_lines).strip() + '\n')
+        f.close()
 
 
 ######################################################################
@@ -94,7 +93,7 @@ class TMCUartHelper:
             return
         # Convert data into a long integer for easy manipulation
         mval = pos = 0
-        for d in data:
+        for d in bytearray(data):
             mval |= d << pos
             pos += 8
         # Extract register value
@@ -111,7 +110,7 @@ class TMCUartHelper:
             return
         # Convert data into a long integer for easy manipulation
         mval = pos = 0
-        for d in data:
+        for d in bytearray(data):
             mval |= d << pos
             pos += 8
         # Extract register value
@@ -219,7 +218,7 @@ repl_seq_r = re.compile(r": seq: 1" + shortseq_s)
 clock_s = r"(?P<clock>[0-9]+)"
 repl_clock_r = re.compile(r"clock=" + clock_s)
 repl_uart_r = re.compile(r"tmcuart_(?:response|send) oid=[0-9]+"
-                         + r" (?:read|write)=b?(?P<msg>(?:'[^']*'"
+                         + r" (?:read|write)=(?P<msg>(?:'[^']*'"
                          + r'|"[^"]*"))')
 
 # MCU shutdown message parsing
@@ -245,8 +244,7 @@ class MCUStream:
                 self.trans_clock(int(m.group('clock')), ts),)
         line = repl_clock_r.sub(clock_update, line)
         def uart_update(m):
-            msg = ast.literal_eval('b' + m.group('msg'))
-            msg = TMCUartHelper().parse_msg(msg)
+            msg = TMCUartHelper().parse_msg(ast.literal_eval(m.group('msg')))
             return m.group(0).rstrip() + msg
         line = repl_uart_r.sub(uart_update, line)
         if self.name != 'mcu':
@@ -384,9 +382,10 @@ class GCodeStream:
     def get_lines(self):
         # Produce output gcode stream
         if self.gcode_stream:
-            data = (ast.literal_eval(gc) for gc in self.gcode_commands)
-            with open(self.gcode_filename, 'wt') as f:
-                f.write(self.gcode_state + ''.join(data))
+            data = [ast.literal_eval(gc) for gc in self.gcode_commands]
+            f = open(self.gcode_filename, 'wb')
+            f.write(self.gcode_state + ''.join(data))
+            f.close()
         return self.gcode_stream
 
 api_cmd_r = re.compile(r"^Received " + time_s + r": \{.*\}$")
@@ -501,13 +500,8 @@ class StatsStream:
             if info[0] is not None and info[0] >= min_stream_ts - 5.:
                 del self.stats_stream[:i]
                 break
-        # Find the first stats timestamp
-        last_ts = min_stream_ts
-        for ts, line_num, line in self.stats_stream:
-            if ts is not None:
-                last_ts = ts
-                break
         # Improve accuracy of stats timestamps
+        last_ts = self.stats_stream[0][0]
         for i, (ts, line_num, line) in enumerate(self.stats_stream):
             if ts is not None:
                 last_ts = self.check_stats_seq(ts, line)
@@ -566,10 +560,10 @@ class GatherShutdown:
         # Produce output sorted by timestamp
         out = [i for s in streams for i in s]
         out.sort()
-        lines = itertools.chain(self.comments, (i[2] for i in out))
-        lines = ('%s\n' % l for l in lines)
-        with open(self.filename, 'wt') as f:
-            f.writelines(lines)
+        out = [i[2] for i in out]
+        f = open(self.filename, 'wb')
+        f.write('\n'.join(self.comments + out))
+        f.close()
 
 
 ######################################################################
@@ -583,31 +577,29 @@ def main():
     handler = None
     recent_lines = collections.deque([], 200)
     # Parse log file
-    with open(logname, 'rt') as f:
-        for line_num, line in enumerate(f):
-            line = line.rstrip()
-            line_num += 1
-            recent_lines.append((line_num, line))
-            if handler is not None:
-                ret = handler.add_line(line_num, line)
-                if ret:
-                    continue
-                recent_lines.clear()
-                handler = None
-            if line.startswith('Git version'):
-                last_git = format_comment(line_num, line)
-            elif line.startswith('Start printer at'):
-                last_start = format_comment(line_num, line)
-            elif line == '===== Config file =====':
-                handler = GatherConfig(configs, line_num,
-                                       recent_lines, logname)
-                handler.add_comment(last_git)
-                handler.add_comment(last_start)
-            elif 'shutdown: ' in line or line.startswith('Dumping '):
-                handler = GatherShutdown(configs, line_num,
-                                         recent_lines, logname)
-                handler.add_comment(last_git)
-                handler.add_comment(last_start)
+    f = open(logname, 'rb')
+    for line_num, line in enumerate(f):
+        line = line.rstrip()
+        line_num += 1
+        recent_lines.append((line_num, line))
+        if handler is not None:
+            ret = handler.add_line(line_num, line)
+            if ret:
+                continue
+            recent_lines.clear()
+            handler = None
+        if line.startswith('Git version'):
+            last_git = format_comment(line_num, line)
+        elif line.startswith('Start printer at'):
+            last_start = format_comment(line_num, line)
+        elif line == '===== Config file =====':
+            handler = GatherConfig(configs, line_num, recent_lines, logname)
+            handler.add_comment(last_git)
+            handler.add_comment(last_start)
+        elif 'shutdown: ' in line or line.startswith('Dumping '):
+            handler = GatherShutdown(configs, line_num, recent_lines, logname)
+            handler.add_comment(last_git)
+            handler.add_comment(last_start)
     if handler is not None:
         handler.finalize()
     # Write found config files
