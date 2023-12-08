@@ -94,43 +94,6 @@ def _regex_find_string(pattern: str, data: str) -> Optional[str]:
         return match.group(1).strip('"')
     return None
 
-def get_print_file_metadata(file_path):
-    result = {}
-    count = 3000
-    try:
-        with open(file_path, "r") as f:
-            while count:
-                count -= 1
-                line = f.readline() 
-                if not line.startswith(";"):
-                    continue
-                if re.findall(r";MINX:(.*)\n", line):  
-                    result["MINX"] = float(re.findall(r";MINX:(.*)\n", line)[0].strip())
-                if re.findall(r";MINY:(.*)\n", line):  
-                    result["MINY"] = float(re.findall(r";MINY:(.*)\n", line)[0].strip()) 
-                if re.findall(r";MINZ:(.*)\n", line):  
-                    result["MINZ"] = float(re.findall(r";MINZ:(.*)\n", line)[0].strip())
-                if re.findall(r";MAXX:(.*)\n", line):  
-                    result["MAXX"] = float(re.findall(r";MAXX:(.*)\n", line)[0].strip()) 
-                if re.findall(r";MAXY:(.*)\n", line):  
-                    result["MAXY"] = float(re.findall(r";MAXY:(.*)\n", line)[0].strip())
-                if re.findall(r";MAXZ:(.*)\n", line):  
-                    result["MAXZ"] = float(re.findall(r";MAXZ:(.*)\n", line)[0].strip())
-                if re.findall(r";Machine Height:(.*)\n", line):  
-                    result["MachineHeight"] = float(re.findall(r";Machine Height:(.*)\n", line)[0].strip())
-                if re.findall(r";Machine Width:(.*)\n", line):  
-                    result["MachineWidth"] = float(re.findall(r";Machine Width:(.*)\n", line)[0].strip())
-                if re.findall(r";Machine Depth:(.*)\n", line):  
-                    result["MachineDepth"] = float(re.findall(r";Machine Depth:(.*)\n", line)[0].strip())
-                if re.findall(r";Material Name:(.*)\n", line):  
-                    result["MaterialName"] = str(re.findall(r";Material Name:(.*)\n", line)[0].strip())
-                if re.findall(r";Material Type:(.*)\n", line):  
-                    result["MaterialType"] = str(re.findall(r";Material Type:(.*)\n", line)[0].strip())
-    except Exception as err:
-        print(err)
-        return None
-    return result
-
 # Slicer parsing implementations
 class BaseSlicer(object):
     def __init__(self, file_path: str) -> None:
@@ -223,9 +186,6 @@ class BaseSlicer(object):
     def parse_first_layer_height(self) -> Optional[float]:
         return None
 
-    def parse_model_info(self):
-        return None
-
     def parse_layer_height(self) -> Optional[float]:
         return None
 
@@ -268,9 +228,6 @@ class UnknownSlicer(BaseSlicer):
 
     def parse_first_layer_height(self) -> Optional[float]:
         return self._parse_min_float(r"G1\sZ\d+\.\d*", self.header_data)
-
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
 
     def parse_object_height(self) -> Optional[float]:
         return self._parse_max_float(r"G1\sZ\d+\.\d*", self.footer_data)
@@ -323,9 +280,6 @@ class PrusaSlicer(BaseSlicer):
             return round(pct / 100. * self.layer_height, 6)
         return _regex_find_first(
             r"; first_layer_height = (\d+\.?\d*)", self.footer_data)
-
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
 
     def parse_layer_height(self) -> Optional[float]:
         self.layer_height = _regex_find_first(
@@ -454,9 +408,6 @@ class Cura(BaseSlicer):
     def parse_first_layer_height(self) -> Optional[float]:
         return _regex_find_first(r";MINZ:(\d+\.?\d*)", self.header_data)
 
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
-
     def parse_layer_height(self) -> Optional[float]:
         self.layer_height = _regex_find_first(
             r";Layer\sheight:\s(\d+\.?\d*)", self.header_data)
@@ -521,9 +472,6 @@ class Simplify3D(BaseSlicer):
 
     def parse_first_layer_height(self) -> Optional[float]:
         return self._parse_min_float(r"G1\sZ\d+\.\d*", self.header_data)
-
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
 
     def parse_layer_height(self) -> Optional[float]:
         self.layer_height = _regex_find_first(
@@ -636,9 +584,6 @@ class KISSlicer(BaseSlicer):
         return _regex_find_first(
             r";\s+first_layer_thickness_mm\s=\s(\d+\.?\d*)", self.header_data)
 
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
-
     def parse_layer_height(self) -> Optional[float]:
         self.layer_height = _regex_find_first(
             r";\s+max_layer_thickness_mm\s=\s(\d+\.?\d*)", self.header_data)
@@ -697,9 +642,6 @@ class IdeaMaker(BaseSlicer):
         if len(layer_info) >= 3:
             return layer_info[2]
         return None
-
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
 
     def parse_layer_height(self) -> Optional[float]:
         layer_info = _regex_find_floats(
@@ -782,9 +724,6 @@ class IceSL(BaseSlicer):
             r";\sz_layer_height_first_layer_mm\s:\s+(\d+\.\d+)",
             self.header_data)
 
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
-
     def parse_layer_height(self) -> Optional[float]:
         self.layer_height = _regex_find_first(
             r";\sz_layer_height_mm\s:\s+(\d+\.\d+)",
@@ -855,9 +794,6 @@ class KiriMoto(BaseSlicer):
             r"; firstSliceHeight = (\d+\.\d+)", self.header_data
         )
 
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
-
     def parse_layer_height(self) -> Optional[float]:
         self.layer_height = _regex_find_first(
             r"; sliceHeight = (\d+\.\d+)", self.header_data
@@ -902,28 +838,23 @@ class KiriMoto(BaseSlicer):
 class Creality(BaseSlicer):
     def check_identity(self, data: str) -> Optional[Dict[str, str]]:
         aliases = {
+            # 'Creative3D': r"PrusaSlicer\s(.*)\son",
+            # 'SuperSlicer': r"SuperSlicer\s(.*)\son",
             'Creative3D': r"Creative3D",
             'Creality': r"Creality"
         }
-        pattern = r'Version : V([\d\.]+)'
-        match_version = re.search(pattern, data)
-        slicer_version = match_version.group(1) if match_version else "1.0"
         for name, expr in aliases.items():
             match = re.search(expr, data)
-            # ;Creality Print Version : V4.3.7.6456
             if match:
                 return {
                     'slicer': name,
-                    'slicer_version': slicer_version
+                    'slicer_version': "1.0"
                 }
         return None
 
     def parse_first_layer_height(self) -> Optional[float]:
         return _regex_find_first(
             r";MINZ:(\d+\.?\d*)", self.footer_data)
-
-    def parse_model_info(self):
-        return get_print_file_metadata(self.path)
 
     def parse_layer_height(self) -> Optional[float]:
         pattern = r";Layer\sheight:\s(\d+\.?\d*)"
@@ -946,14 +877,6 @@ class Creality(BaseSlicer):
     def parse_layer_count(self) -> Optional[int]:
         return _regex_find_int(
             r";LAYER_COUNT\:(\d+)", self.header_data)
-
-    def parse_filament_type(self) -> Optional[str]:
-        return _regex_find_string(
-            r";Material Type:(\S+)", self.header_data)
-
-    def parse_filament_name(self) -> Optional[str]:
-        return _regex_find_string(
-            r";Material Name:(.+)", self.header_data)
 
     def parse_filament_total(self) -> Optional[float]:
         filament_total = _regex_find_first(
@@ -1003,8 +926,7 @@ SUPPORTED_DATA = [
     'filament_name',
     'filament_type',
     'filament_total',
-    'filament_weight_total',
-    'model_info']
+    'filament_weight_total']
 
 def process_objects(file_path: str, slicer: BaseSlicer, name: str) -> bool:
     try:
@@ -1104,10 +1026,6 @@ def extract_metadata(
         result = func()
         if result is not None:
             metadata[key] = result
-    if metadata.get("filament_type"):
-        metadata["model_info"]["MaterialType"] = metadata.get("filament_type")
-    if metadata.get("filament_name"):
-        metadata["model_info"]["MaterialName"] = metadata.get("filament_name")
     return metadata
 
 def extract_ufp(ufp_path: str, dest_path: str) -> None:
